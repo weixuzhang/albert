@@ -1,0 +1,17 @@
+# AI Agent Sandbox Prototype - Dependencies
+
+# OpenAI Integration
+openai>=1.3.0
+
+# For development and testing
+# pytest>=7.0.0  # Uncomment if you prefer pytest over unittest
+# pyyaml>=6.0    # Uncomment when adding YAML conversion functionality
+
+# Python standard libraries used:
+# - json (for JSON handling)
+# - datetime (for timestamps)
+# - uuid (for unique ID generation)
+# - typing (for type hints)
+# - unittest (for testing)
+# - re (for regex operations)
+# - os (for environment variables) 

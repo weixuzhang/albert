@@ -10,13 +10,8 @@ dependencies:
     - pytest>=7.0.0
     - pyyaml>=6.0
 
-# Optional development dependencies (uncomment if needed)
-# - jupyter
-# - ipython
-# - black
-# - flake8
 
 # Environment variables (optional)
 variables:
   # Set these in your conda environment or .env file
-  OPENAI_API_KEY: "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"
+  OPENAI_API_KEY: ""

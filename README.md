@@ -1,7 +1,6 @@
 # AI Agent Sandbox
 
 A multi-agent system that orchestrates AI-powered agents for intelligent task planning and execution. 
-**Status**: Production Ready | **Version**: 2.0.0
 
 
 ## System Architecture

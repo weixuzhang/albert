@@ -125,7 +125,7 @@ Focus on practical details needed for successful execution.
                 return self._extract_analysis_from_text(plan_output, ai_response)
                 
         except Exception as e:
-            print(f"⚠️  Questioning Agent AI analysis failed: {e}")
+            print(f"[WARNING] Questioning Agent AI analysis failed: {e}")
         
         return None
     

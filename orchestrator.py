@@ -3,11 +3,14 @@ Orchestrator - Central coordinator for AI Agent Sandbox
 Manages interactions between agents and consolidates outputs into structured JSON.
 """
 
+import logging
+import time
 from typing import Dict, Any
 from json_schemas import JSONSchemas
 from albert_core import AlbertCore
 from planning_agent import PlanningAgent
 from questioning_agent import QuestioningAgent
+from logger_config import LoggerConfig
 
 
 class Orchestrator:
@@ -37,26 +40,47 @@ class Orchestrator:
             Dict[str, Any]: Consolidated output from all agents
         """
         
-        # Generate unique orchestrator ID
+        start_time = time.time()
         orchestrator_id = JSONSchemas.generate_id("orchestrator")
+        
+        # Log user interaction
+        LoggerConfig.log_user_interaction(user_input)
+        logging.info(f"[Orchestrator {orchestrator_id}] Processing user request")
         
         try:
             # Step 1: Process through Albert Core
+            LoggerConfig.log_agent_activity("Albert Core", "Processing user input")
             albert_output = self.albert_core.process_user_input(user_input)
             
+            # Check for errors in Albert Core output
+            if 'error' in albert_output and albert_output['error']:
+                logging.warning(f"Albert Core returned error: {albert_output['error']}")
+            
             # Step 2: Create plan through Planning Agent
+            LoggerConfig.log_agent_activity("Planning Agent", "Creating plan")
             planning_output = self.planning_agent.create_plan(albert_output)
             
             # Step 3: Refine plan through Questioning Agent
+            LoggerConfig.log_agent_activity("Questioning Agent", "Refining plan")
             questioning_output = self.questioning_agent.refine_plan(planning_output)
             
             # Step 4: Generate final consolidated result
+            logging.info("Consolidating results from all agents")
             final_result = self._create_final_result(
                 albert_output, planning_output, questioning_output
             )
             
+            # Calculate processing time
+            processing_time = time.time() - start_time
+            
+            # Log successful completion
+            LoggerConfig.log_user_interaction(
+                user_input, processing_time=processing_time, success=True
+            )
+            logging.info(f"Request processed successfully in {processing_time:.2f}s")
+            
             # Return consolidated orchestrator output
-            return JSONSchemas.orchestrator_schema(
+            result = JSONSchemas.orchestrator_schema(
                 orchestrator_id=orchestrator_id,
                 user_input=user_input,
                 albert_output=albert_output,
@@ -65,9 +89,27 @@ class Orchestrator:
                 final_result=final_result
             )
             
+            # Add processing metadata
+            result['processing_metadata'] = {
+                'processing_time_seconds': round(processing_time, 2),
+                'agents_used': ['albert_core', 'planning_agent', 'questioning_agent'],
+                'success': True
+            }
+            
+            return result
+            
         except Exception as e:
+            # Calculate processing time for failed request
+            processing_time = time.time() - start_time
+            
+            # Log error
+            logging.error(f"Error in orchestrator pipeline: {e}")
+            LoggerConfig.log_user_interaction(
+                user_input, processing_time=processing_time, success=False
+            )
+            
             # Handle any errors in the agent pipeline
-            return self._create_error_response(orchestrator_id, user_input, str(e))
+            return self._create_error_response(orchestrator_id, user_input, str(e), processing_time)
     
     def _create_final_result(self, albert_output: Dict[str, Any], 
                            planning_output: Dict[str, Any], 
@@ -205,7 +247,8 @@ class Orchestrator:
         
         return recommendations
     
-    def _create_error_response(self, orchestrator_id: str, user_input: str, error_message: str) -> Dict[str, Any]:
+    def _create_error_response(self, orchestrator_id: str, user_input: str, 
+                             error_message: str, processing_time: float = 0.0) -> Dict[str, Any]:
         """Create error response when agent pipeline fails"""
         
         return {
@@ -221,8 +264,15 @@ class Orchestrator:
                 'action_plan': [],
                 'recommendations': [
                     "Please try rephrasing your request",
-                    "Ensure your input is clear and specific"
+                    "Ensure your input is clear and specific",
+                    "Check system logs for more details"
                 ]
+            },
+            'processing_metadata': {
+                'processing_time_seconds': round(processing_time, 2),
+                'agents_used': [],
+                'success': False,
+                'error_type': 'orchestrator_pipeline_error'
             },
             'timestamp': JSONSchemas.get_timestamp()
         }

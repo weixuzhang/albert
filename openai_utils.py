@@ -5,6 +5,7 @@ Handles API calls, error handling, and fallback mechanisms.
 
 import json
 import time
+import logging
 from typing import Dict, Any, Optional, Union
 from openai import OpenAI
 from config import Config
@@ -23,7 +24,8 @@ class OpenAIClient:
                 self.client = OpenAI(api_key=Config.OPENAI_API_KEY)
                 self.is_configured = True
             except Exception as e:
-                print(f"❌ Failed to initialize OpenAI client: {e}")
+                logging.error(f"Failed to initialize OpenAI client: {e}")
+                print(f"[ERROR] Failed to initialize OpenAI client: {e}")
                 self.is_configured = False
     
     def call_openai_api(self, messages: list, system_prompt: Optional[str] = None, 
@@ -64,15 +66,18 @@ class OpenAIClient:
                 return response.choices[0].message.content
                 
             except Exception as e:
-                print(f"⚠️  OpenAI API call failed (attempt {attempt + 1}/{max_retries}): {e}")
+                error_msg = f"OpenAI API call failed (attempt {attempt + 1}/{max_retries}): {e}"
+                logging.warning(error_msg)
+                print(f"[WARNING] {error_msg}")
                 
                 if attempt < max_retries - 1:
                     # Wait before retrying (exponential backoff)
-                    wait_time = 2 ** attempt
+                    wait_time = min(2 ** attempt, 30)  # Cap at 30 seconds
                     print(f"   Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
                 else:
-                    print("❌ OpenAI API call failed after all retries")
+                    logging.error("OpenAI API call failed after all retries")
+                    print("[ERROR] OpenAI API call failed after all retries")
                     return None
         
         return None
@@ -114,7 +119,25 @@ class OpenAIClient:
                 return {"response": response.strip()}
                 
         except json.JSONDecodeError as e:
-            print(f"⚠️  Failed to parse JSON from OpenAI response: {e}")
+            logging.warning(f"Failed to parse JSON from OpenAI response: {e}")
+            print(f"[WARNING] Failed to parse JSON from OpenAI response: {e}")
+            # Try to salvage partial JSON
+            try:
+                # Remove common prefixes/suffixes that might break JSON
+                cleaned_response = response.strip()
+                for prefix in ['```json', '```', 'json']:
+                    if cleaned_response.startswith(prefix):
+                        cleaned_response = cleaned_response[len(prefix):].strip()
+                for suffix in ['```']:
+                    if cleaned_response.endswith(suffix):
+                        cleaned_response = cleaned_response[:-len(suffix)].strip()
+                
+                # Try parsing again
+                if cleaned_response.startswith('{') and cleaned_response.endswith('}'):
+                    return json.loads(cleaned_response)
+            except:
+                pass
+            
             return {"response": response.strip()}
     
     def test_connection(self) -> bool:
@@ -134,7 +157,8 @@ class OpenAIClient:
             return response is not None
             
         except Exception as e:
-            print(f"❌ OpenAI connection test failed: {e}")
+            logging.error(f"OpenAI connection test failed: {e}")
+            print(f"[ERROR] OpenAI connection test failed: {e}")
             return False
 
 

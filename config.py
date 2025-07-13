@@ -4,6 +4,7 @@ Handles OpenAI API settings and system configurations.
 """
 
 import os
+import logging
 from typing import Optional
 
 
@@ -11,7 +12,7 @@ class Config:
     """Configuration class for the AI Agent Sandbox system"""
     
     # OpenAI API Configuration
-    OPENAI_API_KEY: Optional[str] = os.getenv('OPENAI_API_KEY') or "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"
+    OPENAI_API_KEY: Optional[str] = os.getenv('OPENAI_API_KEY')
     OPENAI_MODEL: str = "gpt-4o"  # GPT-4 Omni model
     OPENAI_MAX_TOKENS: int = 2000
     OPENAI_TEMPERATURE: float = 0.7
@@ -24,6 +25,14 @@ class Config:
     MAX_RETRIES: int = 3
     TIMEOUT_SECONDS: int = 30
     
+    # Logging Configuration
+    LOG_LEVEL: str = os.getenv('AI_SANDBOX_LOG_LEVEL', 'INFO')
+    ENABLE_FILE_LOGGING: bool = os.getenv('AI_SANDBOX_FILE_LOGGING', 'true').lower() == 'true'
+    
+    # Security Configuration
+    MAX_INPUT_LENGTH: int = 10000
+    MAX_RESPONSE_LENGTH: int = 5000
+    
     @classmethod
     def validate_openai_config(cls) -> bool:
         """
@@ -33,13 +42,13 @@ class Config:
             bool: True if configuration is valid
         """
         if not cls.OPENAI_API_KEY:
-            print("⚠️  Warning: OPENAI_API_KEY not found in environment variables")
-            print("   Please set your OpenAI API key:")
-            print("   export OPENAI_API_KEY='your-api-key-here'")
+            print("[WARNING] OPENAI_API_KEY not found in environment variables")
+            print("[INFO] Please set your OpenAI API key:")
+            print("[INFO] export OPENAI_API_KEY='your-api-key-here'")
             return False
         
         if not cls.OPENAI_MODEL:
-            print("⚠️  Warning: OPENAI_MODEL not specified")
+            print("[WARNING] OPENAI_MODEL not specified")
             return False
             
         return True
@@ -62,16 +71,20 @@ class Config:
     @classmethod
     def display_config(cls) -> None:
         """Display current configuration"""
-        print("🔧 AI Agent Sandbox Configuration")
+        print("AI Agent Sandbox Configuration")
         print("=" * 40)
-        print(f"OpenAI API Key: {'✅ Set' if cls.OPENAI_API_KEY else '❌ Not Set'}")
+        print(f"OpenAI API Key: {'Set' if cls.OPENAI_API_KEY else 'Not Set'}")
         print(f"OpenAI Model: {cls.OPENAI_MODEL}")
         print(f"Max Tokens: {cls.OPENAI_MAX_TOKENS}")
         print(f"Temperature: {cls.OPENAI_TEMPERATURE}")
-        print(f"AI Agents Enabled: {'✅' if cls.ENABLE_AI_AGENTS else '❌'}")
-        print(f"Fallback to Simple Agents: {'✅' if cls.FALLBACK_TO_SIMPLE_AGENTS else '❌'}")
+        print(f"AI Agents Enabled: {'Enabled' if cls.ENABLE_AI_AGENTS else 'Disabled'}")
+        print(f"Fallback to Simple Agents: {'Enabled' if cls.FALLBACK_TO_SIMPLE_AGENTS else 'Disabled'}")
         print(f"Max Retries: {cls.MAX_RETRIES}")
         print(f"Timeout: {cls.TIMEOUT_SECONDS}s")
+        print(f"Log Level: {cls.LOG_LEVEL}")
+        print(f"File Logging: {'Enabled' if cls.ENABLE_FILE_LOGGING else 'Disabled'}")
+        
+        logging.info("Configuration displayed to user")
 
 
 # Agent-specific prompts and instructions
@@ -137,4 +150,41 @@ Guidelines:
 - Be thorough but not overwhelming
 
 Your goal is to ensure plans are complete, clear, and executable.
-""" 
+"""
+
+
+class SecurityConfig:
+    """Security configuration and validation rules"""
+    
+    # Input validation patterns
+    SUSPICIOUS_PATTERNS = [
+        r'<script[^>]*>.*?</script>',  # Script tags
+        r'javascript:',  # JavaScript URLs
+        r'data:.*base64',  # Data URLs
+        r'eval\s*\(',  # eval() calls
+        r'exec\s*\(',  # exec() calls
+    ]
+    
+    # Rate limiting (future implementation)
+    MAX_REQUESTS_PER_MINUTE = 60
+    MAX_REQUESTS_PER_HOUR = 1000
+    
+    @classmethod
+    def is_input_safe(cls, user_input: str) -> bool:
+        """
+        Check if user input is safe based on security patterns
+        
+        Args:
+            user_input: User input to validate
+            
+        Returns:
+            bool: True if input appears safe
+        """
+        import re
+        
+        for pattern in cls.SUSPICIOUS_PATTERNS:
+            if re.search(pattern, user_input, re.IGNORECASE):
+                logging.warning(f"Suspicious pattern detected: {pattern}")
+                return False
+        
+        return True 

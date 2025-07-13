@@ -4,6 +4,8 @@ Receives and processes initial user inputs, provides immediate responses or prel
 Enhanced with OpenAI GPT-4 capabilities.
 """
 
+import re
+import logging
 from typing import Dict, Any
 from json_schemas import JSONSchemas
 from config import Config, AgentPrompts
@@ -32,16 +34,16 @@ class AlbertCore:
             Dict[str, Any]: Structured response following albert_core_schema
         """
         
-        # Handle empty or invalid input
-        if not user_input or not isinstance(user_input, str) or not user_input.strip():
+        # Validate and sanitize input
+        validation_result = self._validate_and_sanitize_input(user_input)
+        if validation_result['error']:
             return JSONSchemas.albert_core_schema(
                 user_input=user_input or "",
                 response="",
-                error="Invalid or empty input provided"
+                error=validation_result['error']
             )
         
-        # Clean the input
-        cleaned_input = user_input.strip()
+        cleaned_input = validation_result['cleaned_input']
         
         # Generate response based on input analysis
         response = self._generate_response(cleaned_input)
@@ -106,7 +108,7 @@ class AlbertCore:
                 return ai_response['response'].strip()
             
         except Exception as e:
-            print(f"⚠️  Albert Core AI response failed: {e}")
+            print(f"[WARNING] Albert Core AI response failed: {e}")
         
         return ""
     
@@ -146,6 +148,60 @@ class AlbertCore:
         Returns:
             Dict[str, Any]: Agent information
         """
+    def _validate_and_sanitize_input(self, user_input: str) -> Dict[str, Any]:
+        """
+        Validate and sanitize user input
+        
+        Args:
+            user_input (str): Raw user input
+            
+        Returns:
+            Dict[str, Any]: Validation result with cleaned input or error
+        """
+        
+        # Check for None or non-string input
+        if user_input is None:
+            return {'error': 'Input cannot be None', 'cleaned_input': ''}
+        
+        if not isinstance(user_input, str):
+            return {'error': 'Input must be a string', 'cleaned_input': ''}
+        
+        # Basic length validation
+        if len(user_input) > 10000:  # Reasonable limit
+            return {'error': 'Input too long (max 10,000 characters)', 'cleaned_input': ''}
+        
+        # Strip whitespace
+        cleaned = user_input.strip()
+        
+        # Check for empty input
+        if not cleaned:
+            return {'error': 'Empty input provided', 'cleaned_input': ''}
+        
+        # Remove potentially harmful characters
+        # Remove control characters except newlines and tabs
+        cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', cleaned)
+        
+        # Basic profanity/spam detection (simple approach)
+        suspicious_patterns = [
+            r'<script[^>]*>.*?</script>',  # Script tags
+            r'javascript:',  # JavaScript URLs
+            r'data:.*base64',  # Data URLs
+        ]
+        
+        for pattern in suspicious_patterns:
+            if re.search(pattern, cleaned, re.IGNORECASE):
+                logging.warning(f"Suspicious input detected: {pattern}")
+                return {'error': 'Input contains potentially harmful content', 'cleaned_input': ''}
+        
+        return {'error': None, 'cleaned_input': cleaned}
+    
+    def get_agent_info(self) -> Dict[str, Any]:
+        """
+        Get agent information and capabilities.
+        
+        Returns:
+            Dict[str, Any]: Agent information
+        """
         return {
             'agent_name': self.agent_name,
             'version': self.version,
@@ -156,5 +212,10 @@ class AlbertCore:
                 'Agent coordination initiation'
             ],
             'input_format': 'Natural language text',
-            'output_format': 'Structured JSON (albert_core_schema)'
+            'output_format': 'Structured JSON (albert_core_schema)',
+            'security_features': [
+                'Input validation and sanitization',
+                'Length limits and type checking',
+                'Suspicious content detection'
+            ]
         } 

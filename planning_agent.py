@@ -111,7 +111,7 @@ Focus on practical, executable tasks that directly address the user's needs.
                 return self._extract_tasks_from_text(ai_response)
                 
         except Exception as e:
-            print(f"⚠️  Planning Agent AI response failed: {e}")
+            print(f"[WARNING] Planning Agent AI response failed: {e}")
         
         return []
     
